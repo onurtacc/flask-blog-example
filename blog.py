@@ -80,6 +80,10 @@ def login():
                 cursor.close()
                 flash("You have successfully logged in", "success")
                 db.close()
+
+                session["logged_in"] = True
+                session["username"] = username
+
                 return redirect(url_for("index"))
             else:
                 cursor.close()
@@ -94,6 +98,12 @@ def login():
 
     else:
         return render_template("login.html", form=form)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("index"))
 
 
 if __name__ == "__main__":
