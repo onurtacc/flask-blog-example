@@ -18,6 +18,7 @@ class RegisterForm(Form):
 
 DATABASE = './db.sqlite3'
 app = Flask(__name__)
+app.secret_key = "flask_blog"
 
 
 @app.route("/")
@@ -44,6 +45,7 @@ def register():
         cursor.execute(query, (name, email, username, password))
         db.commit()
         cursor.close()
+        flash("You have successfully registered", "success")
         db.close()
         return redirect(url_for("index"))
     else:
