@@ -169,6 +169,26 @@ def article(article_id):
         return render_template("article.html")
 
 
+@app.route("/search", methods=["GET", "POST"])
+def search():
+    if request.method == "GET":
+        return redirect(url_for("index"))
+    else:
+        keyword = request.form.get("keyword")
+        db = sqlite3.connect(DATABASE)
+        db.row_factory = sqlite3.Row
+        cursor = db.cursor()
+
+        query = "SELECT * FROM articles where title LIKE '%" + keyword + "%'"
+        cursor.execute(query)
+        data = cursor.fetchall()
+        if data:
+            return render_template("articles.html", articles=data)
+        else:
+            flash("No articles found", "warning")
+            return redirect(url_for("articles"))
+
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
     form = RegisterForm(request.form)
