@@ -64,13 +64,21 @@ def articles():
     data = cursor.fetchall()
     if data:
         return render_template("articles.html", articles=data)
-    else:
-        return render_template("articles.html")
+
+    return render_template("articles.html")
 
 
 @app.route("/dashboard")
 @login_required
 def dashboard():
+    db = sqlite3.connect(DATABASE)
+    db.row_factory = sqlite3.Row
+    cursor = db.cursor()
+    query = "SELECT * FROM articles where author=?"
+    cursor.execute(query, (session["username"],))
+    data = cursor.fetchall()
+    if data:
+        return render_template("dashboard.html", articles=data)
     return render_template("dashboard.html")
 
 
@@ -94,6 +102,71 @@ def add_article():
         return redirect(url_for("dashboard"))
 
     return render_template("add-article.html", form=form)
+
+
+@app.route("/delete/<string:article_id>")
+@login_required
+def delete_article(article_id):
+    db = sqlite3.connect(DATABASE)
+    cursor = db.cursor()
+
+    query = "SELECT * FROM articles where author=? and id=?"
+    cursor.execute(query, (session["username"], article_id))
+    data = cursor.fetchone()
+    if data:
+        query_2 = "DELETE FROM articles where id=?"
+        cursor.execute(query_2, (article_id,))
+        db.commit()
+        cursor.close()
+        return redirect(url_for("dashboard"))
+    else:
+        flash("No such article, or you are not authorized to delete this article.", "danger")
+        return redirect(url_for("index"))
+
+
+@app.route("/edit/<string:article_id>", methods=["GET", "POST"])
+@login_required
+def update_article(article_id):
+    db = sqlite3.connect(DATABASE)
+    db.row_factory = sqlite3.Row
+    cursor = db.cursor()
+    if request.method == "GET":
+        query = "SELECT * FROM articles where id=? and author=?"
+        cursor.execute(query, (article_id, session["username"]))
+        data = cursor.fetchone()
+        if data:
+            form = ArticleForm()
+            form.title.data = data["title"]
+            form.content.data = data["content"]
+            return render_template("update.html", form=form)
+        else:
+            flash("No such article, or you are not authorized to delete this article.", "danger")
+            return redirect(url_for("index"))
+    else:
+        form = ArticleForm(request.form)
+        new_title = form.title.data
+        new_content = form.content.data
+        query = "UPDATE articles SET title=?, content=? where id=?"
+
+        cursor.execute(query, (new_title, new_content, article_id))
+        db.commit()
+        flash("Article successfully updated", "success")
+        return redirect(url_for("dashboard"))
+
+
+@app.route("/article/<string:article_id>")
+def article(article_id):
+    db = sqlite3.connect(DATABASE)
+    db.row_factory = sqlite3.Row
+    cursor = db.cursor()
+    query = "SELECT * FROM articles where id=?"
+    cursor.execute(query, (article_id,))
+    data = cursor.fetchone()
+
+    if data:
+        return render_template("article.html", article=data)
+    else:
+        return render_template("article.html")
 
 
 @app.route("/register", methods=["GET", "POST"])
