@@ -1,7 +1,24 @@
 from flask import Flask, render_template, flash, redirect, url_for, session, logging, request, g
 from wtforms import Form, StringField, TextAreaField, PasswordField, validators
 from passlib.hash import sha256_crypt
+from functools import wraps
 import sqlite3
+
+DATABASE = './db.sqlite3'
+app = Flask(__name__)
+app.secret_key = "flask_blog"
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "logged_in" in session:
+            return f(*args, **kwargs)
+        else:
+            flash("Please login", "danger")
+            return redirect(url_for("login"))
+
+    return decorated_function
 
 
 class RegisterForm(Form):
@@ -20,9 +37,9 @@ class LoginForm(Form):
     password = PasswordField("Password")
 
 
-DATABASE = './db.sqlite3'
-app = Flask(__name__)
-app.secret_key = "flask_blog"
+class ArticleForm(Form):
+    title = StringField("Article Title", validators=[validators.Length(min=5, max=100)])
+    content = TextAreaField("Article Content", validators=[validators.Length(min=10)])
 
 
 @app.route("/")
@@ -33,6 +50,50 @@ def index():
 @app.route("/about")
 def about():
     return render_template("about.html")
+
+
+@app.route("/articles")
+def articles():
+    db = sqlite3.connect(DATABASE)
+    db.row_factory = sqlite3.Row
+    cursor = db.cursor()
+
+    query = "SELECT * FROM articles"
+
+    cursor.execute(query)
+    data = cursor.fetchall()
+    if data:
+        return render_template("articles.html", articles=data)
+    else:
+        return render_template("articles.html")
+
+
+@app.route("/dashboard")
+@login_required
+def dashboard():
+    return render_template("dashboard.html")
+
+
+@app.route("/add-article", methods=["GET", "POST"])
+@login_required
+def add_article():
+    form = ArticleForm(request.form)
+    if request.method == "POST" and form.validate():
+        title = form.title.data
+        content = form.content.data
+
+        db = sqlite3.connect(DATABASE)
+        cursor = db.cursor()
+
+        query = "INSERT INTO articles(title, author, content) VALUES (?,?,?)"
+        cursor.execute(query, (title, session["username"], content))
+        db.commit()
+        cursor.close()
+        flash("Article successfully added", "success")
+        db.close()
+        return redirect(url_for("dashboard"))
+
+    return render_template("add-article.html", form=form)
 
 
 @app.route("/register", methods=["GET", "POST"])
